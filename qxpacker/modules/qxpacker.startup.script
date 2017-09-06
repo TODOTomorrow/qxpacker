@@ -10,7 +10,8 @@ lspackage() {
 showhelp() {
     echo "Help:"
     echo "\t-l | --list  - show archive content"
-    echo "\t-i | --infor - show archive information"
+    echo "\t-i | --info - show archive information"
+    echo "\t-t | --target - show archive information"
     echo "\t-h | --help  - show this message and exit"
     exit
 }
