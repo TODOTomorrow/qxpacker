@@ -7,7 +7,11 @@ Advantages:
 
 # Installation
 
-qxpacker doesnot require installation. But for more usability you can copy all files with .py extension and file qxpacker.startup.script to directory, contained in $PATH variable (/usr/local/bin for example). 
+You can install it using pip
+
+```
+# python setup.py sdist ; pip install ./dist/qxpacker-0.1.tar.gz
+```
 
 # Creating install package
 To see help for syntax type:
@@ -26,11 +30,11 @@ To determine specific target path (usr/bin for example), use following:
 ```
 After this all files and directories after options -r usr/bin will put into directory usr/bin on target system.
 
-To call custom shell code (for example "echo Hello world!"), use following:
+To add some script file, which will be executed on installation process, use following:
 ```
 # qxpacker -s "echo Hello world" -r usr/bin dir1 file1 -o mypack.sh
 ```
-After this command "echo Hello world" will be called while installation going.
+Note, that if you want to start your code after basic installation initialization, your code should be into main() function.
 
 # Installation created package
 
@@ -44,15 +48,4 @@ If installation path not specified it will be set into ./(current directory)
 
 In startup code (begin, startup or after code), you can use some system variables and functions:
 
-### Global variables:
-
-| Variable definition | Description | Access mode |
-|:-------------------:|:-----------:|:-----------:|
-| TARGET_DIR=\<DIRNAME\> | directory to extracting files and directories (may be passed as parameter to installer). | read-write |
-| BE_VERBOSE=\<True\|False\> | verbose mode flag | read-write |
-| SELFNAME=\<File\> | path to current installer file | read-only |
-| INSTALLER_TMPDIR=\<Dir\> | directory to save some temproray files | read-only |
-| INSTALLER_UID=\<Number\> | unical ID of installer | read-only |
-| EXTRACTOR_TYPE=\<dd\|shell\> | type of extractor (dd utility, or shell commands) | read-only |
-| PAYLOAD_TYPE=\<tar\|shell\> | type of payload (tar archive, or shell commands) | read-only |
 
