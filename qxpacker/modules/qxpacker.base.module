@@ -1,0 +1,26 @@
+#Some base constants
+TRUE=0
+FALSE=1
+
+# Return value of variable by name
+# Args:
+# $1-$n - name
+val() {
+    eval echo '$'$1
+}
+
+set_val() {
+    eval $1'="'$2'"'
+}
+
+is_num() {
+    if [ "$1" -eq "$1" ] 2>/dev/null;  then 
+        return 0
+    else
+        return 1
+    fi
+}
+
+sizeof() {
+    echo $#
+}

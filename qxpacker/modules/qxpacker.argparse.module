@@ -1,0 +1,222 @@
+# OPTIONS MODULE
+# IMPORTANT: This module not support multiplie option in single args
+# for example options -r and -e cannot be in argument "-re"
+# REQUIRE : base
+
+ARGPARSE_OPTION_NAMES=""
+GETOPTS_STRING=":-:"
+ARGPARSE_DEFAULT=""
+
+
+argparse_scatter_args() {
+    local shiftto=$(($1+1))
+    if [ "$shiftto" -gt "$#" ] ; then
+        shiftto=$#
+    fi
+    shift $shiftto
+    ARGS=""
+    for ar in $@ ; do
+        if check_is_optstring $ar ; then
+            break
+        fi
+        ARGS="$ARGS $ar"
+    done
+    echo $ARGS
+}
+
+# Check type function
+# Args:
+# $1 - variable name (for error message)
+# $2 - variable type
+# $3... - variable value
+argparse_check_type() {
+    local name=$1
+    local type=$2
+    local err="False"
+    local shiftto=2
+    if [ "$shiftto" -gt "$#" ] ; then
+        shiftto=$#
+    fi
+    shift $shiftto
+    case $type in
+        "Boolean") 
+                if [ "$1" != "True" -a "$1" != "False" ] ; then
+                    err="True"
+                    break
+                fi
+                ;;
+        "Number") 
+                if ! is_num "$1" ;  then 
+                    err="True"
+                    break
+                fi
+                ;;
+        "String") true ;;
+        "None") true ;;
+        "Function") true ;;
+    esac
+    
+    if [ "$err" = "True" ] ; then
+        echo "Error. Variable $name expected type $type, but value $1 passed"
+        return 1
+    fi
+    return 0
+}
+
+argparse_parse_option() {
+    name=$1
+    type=`val _${name}_TYPE`
+    if [ "$#" -ge "1" ] ; then
+        shift 1
+    fi
+    value="$@"
+    if [ "$#" = "0" ] ; then
+        def=`val _$name_DEFAULT`
+        value="$def"
+    fi
+    
+    if ! argparse_check_type $name $value ; then
+        return 0
+    fi
+    
+    case $type in
+        "Boolean") set_val $name $value ; if [ "$#" != 0 ] ; then return 1 ; fi ;;
+        "Number")  set_val $name $value ; if [ "$#" != 0 ] ; then return  1 ; fi ;;
+        "String")  set_val $name $value ; if [ "$#" != 0 ] ; then return 1 ; fi ;;
+        "None")    set_val $name "" ;;
+        "Function") $name $@ ; return `sizeof $@` ;;
+    esac
+    return 0   
+}
+
+
+check_is_optstring() {
+    local letters="qwertyuiopasdfghjklzxcvbnQWERTYUIOPASDFGHJKLZXCVBNM-"
+    local sh_str="getopts \"$letters\" r $1 ; echo \$OPTIND "   
+    local r=`/bin/sh -c "$sh_str"`
+    if [ "$r" != "1" ] ; then
+        return $TRUE
+    else
+        return $FALSE
+    fi
+}
+
+# Return name by passed option name
+# Args:
+#  $1 - option
+argparse_name_by_opt() {
+    local is_val="False"
+    local fkey=""
+    for key in $ARGPARSE_OPTION_NAMES ; do 
+        if [ "$fkey" = "" ] ; then
+            if [ $is_val = "True" ] ; then is_val="False" ; continue ; fi
+            if [ $key != "$1" ] ; then is_val="True" ;  continue ; fi
+        fi
+        if [ "$fkey" = "" ] ; then fkey="$key" ; continue; fi
+        echo $key
+        break
+    done
+}
+
+argparse_parse_options() {
+    OPTIND_PRED=1
+    
+    while getopts ${GETOPTS_STRING} arg $@  ; do
+        ARG=$OPTARG
+        OPTIND_DIFF=$(($OPTIND-$OPTIND_PRED))
+        OPTIND_PRED=$OPTIND
+        ## Short options processing
+        if [ "$arg" != "-" -a "$arg" != "?" ] ; then
+            if [ "$OPTARG" != "" ] ; then
+                if check_is_optstring $OPTARG ; then
+                    ARG=""
+                    if [ "$OPTIND_DIFF" = "2" ] ; then
+                        OPTIND=$(($OPTIND-1))
+                    fi
+                fi
+            fi
+            local fname="`argparse_name_by_opt $arg`"
+            args=`argparse_scatter_args $(($OPTIND-1)) $@`
+            argparse_parse_option $fname $args
+            if [ "$?" != "0" ] ; then
+                OPTIND=$(($OPTIND+$?))
+            fi
+            continue
+        fi
+        # Long options processing
+        if [ "$arg" = "-" ] ; then
+            local fname="`argparse_name_by_opt $OPTARG`"
+            args=`argparse_scatter_args $(($OPTIND-1)) $@`
+            argparse_parse_option "$fname" $args
+            OPTIND=$(($OPTIND+$?))
+        fi
+    done
+    OPTIND=$(($OPTIND-1))
+    if [ "$OPTIND" -lt "$#" ] ; then
+        shift $OPTIND
+    else
+        shift $#
+    fi
+    ARGPARSE_DEFAULT="$@"
+}
+
+# Add option to parsing
+# Args:
+# $1 - short option
+# $2 - long option
+# $3 - name
+# $4 - type. Available : Boolean, Number, String, None (None by default)
+# $5 - default value
+argparse_add_option() {
+    local name=$3
+    local option=$1
+    local long_option=$2
+    local type="None"
+    local default=""
+    if [ "$4" != "" ] ; then type="$4" ; fi
+    case $type in
+        "Boolean") default="False" ;;
+        "Number") default="0" ;;
+        "String") default="" ;;
+        "None") default="";;
+        "Function") default="";;
+    esac
+    if [ "$5" != "" ] ; then default="$5" ; fi
+    if [ "$type" != "Function" ] ; then
+        set_val "_$name_DEFAULT" $default
+    fi
+    set_val _${name}_TYPE $type
+    local SHORT_OPTION_STR=""
+    local getoptstr=""
+    local ARG_REQ=""
+    if [ "$option" != "-" ] ; then
+        SHORT_OPTION_STR="$option $name "
+        getoptstr=$option
+        case $type in
+            "Boolean") ARG_REQ="" ;;
+            "Number") ARG_REQ="" ;;
+            "String") ARG_REQ="" ;;
+            "None") ARG_REQ="" ;;
+            "Function") ARG_REQ="";;
+        esac
+    fi
+    
+    local LONG_OPTION_STR=""
+    if [ "$long_option" != "-" ] ; then
+        LONG_OPTION_STR="$long_option $name "
+    fi
+    ARGPARSE_OPTION_NAMES="$ARGPARSE_OPTION_NAMES $SHORT_OPTION_STR $LONG_OPTION_STR"
+    GETOPTS_STRING="${GETOPTS_STRING}$getoptstr${ARG_REQ}"
+}
+
+# Add alias to passed option (-v and --verbose for example)
+# Args:
+# $1 - option name
+# $2 - alias option
+argparse_alias() {
+    ARGPARSE_OPTION_NAMES="$ARGPARSE_OPTION_NAMES $2 $1"
+}
+
+argparse_init() {
+    OPTIND=0
+}

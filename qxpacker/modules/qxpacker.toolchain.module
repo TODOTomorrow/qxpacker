@@ -1,0 +1,9 @@
+
+configure_echo_binary() {
+    if [ "`echo -en`" != "" ] ; then
+        echo "echo -en not supported. Exit"
+        exit
+    else
+        ECHO_CMD="echo -en"
+    fi
+}

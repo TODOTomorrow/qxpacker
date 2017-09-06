@@ -1,0 +1,57 @@
+# REQUIRE : array, argparse
+# Needed utilites : mkdir, rm, chmod, pwd, cp
+
+lspackage() {
+    echo "Archive files:"
+    foreach "FILES" "echo \t\t"
+    exit
+}
+
+showhelp() {
+    echo "Help:"
+    echo "\t-l | --list  - show archive content"
+    echo "\t-i | --infor - show archive information"
+    echo "\t-h | --help  - show this message and exit"
+    exit
+}
+
+showinfo() {
+    
+    echo "Information:"
+    echo "\tContainer type : $CONTAINER_TYPE"
+    echo "\t`array_length FILES` files contained"   
+    exit
+}
+
+_main() {
+    INSTALL_DIR="./"
+    argparse_init
+    argparse_add_option "l" "list" "lspackage" "Function"
+    argparse_add_option "h" "help" "showhelp" "Function"
+    argparse_add_option "t" "target" "INSTALL_DIR" "String" "./"
+    argparse_add_option "i" "info" "showinfo" "Function"
+    argparse_parse_options $@
+    
+    type main >/dev/null 2>/dev/null
+    if [ "$?" = "0" ] ; then
+        main $@
+    fi
+    
+    answ=""
+    if [ ! -d "$INSTALL_DIR" ] ; then
+        echo "Target directory '$INSTALL_DIR' not exists. Exiting..."
+        exit
+    fi
+    
+    cd $INSTALL_DIR
+    while [ "$answ" != "Y" ] ; do
+        read -p "Install files to the directory '$INSTALL_DIR' ? [Y/n]" answ
+        if [ "$answ" != "Y" ] ; then
+            echo "Terminating..."
+            exit
+        fi
+    done
+    echo "Extracting data"
+    extract_data
+    exit
+}

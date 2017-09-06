@@ -1,0 +1,102 @@
+#!/usr/bin/python
+
+#import optparse
+import argparse
+import os , random, tempfile
+import sys, stat
+from qxpacker.DdContainer import DdContainer
+from qxpacker.EchoContainer import EchoContainer
+from qxpacker.TarContainer import TarContainer
+from qxpacker.shellgen import ShellScriptBuilder
+import pkg_resources
+
+DEFAULT_TARGET_PATH='./'
+stored_items = []
+
+p = argparse.ArgumentParser()
+p.add_argument("-s", "--script", dest="scripts", 
+               help="Initial script, runned in installer", 
+               metavar="FILE|String", default=[], action="append")
+
+p.add_argument("-p", "--path", dest="paths", 
+               help="Additional path for modules and scripts searching", 
+               metavar="FILE|String", default=[], action="append")
+
+p.add_argument("-o", "--output", dest="output", 
+               help="Output file name", metavar="FILE", default = "package.sh")
+               
+p.add_argument("-e", "--extractor-type", dest="etype", 
+               help="define extractor type", metavar="dd|tar|echo", default="tar")
+               
+p.add_argument("-v", "--version", dest="version", help="print version and exit", action="store_const", const=True, default=False)
+
+(args , unk) = p.parse_known_args()
+troot=False
+exclude=False
+now_root="./"
+exclude_files = []
+ui=0
+for arg in unk:
+     if arg[0] == '-':
+          if "r" in arg: troot=True
+          if "x" in arg: exclude=True
+          ui+=1
+          continue
+     
+     if troot:
+          troot=False
+          now_root=arg
+          ui+=1
+          continue
+     
+     if exclude:
+         exclude=False
+         ui+=1
+         exclude_files.append(arg)
+         continue
+     
+     if arg == unk[ui]:
+          stored_items.append((unk[ui], now_root))
+          ui+=1
+    
+     if ui >= len(unk):
+          break
+
+cd = os.getcwd()
+if args.version != False : 
+    print "qxpacker version 1.3.0"
+    exit()
+
+shellctx = ShellScriptBuilder()
+for p in args.paths:
+     shellctx.add_path(p)
+
+shellctx.add_path(pkg_resources.resource_filename('qxpacker', 'modules/'))
+shellctx.add_path('/usr/local/qxpacker/modules')
+
+if args.etype == "dd":
+    cntnr = DdContainer()
+elif args.etype == "tar":
+    cntnr = TarContainer()
+elif args.etype == "echo":
+    cntnr = EchoContainer()
+
+for a in stored_items:
+    cntnr.add(a[0], tpath=a[1])
+
+for e in exclude_files:
+    cntnr.exclude(e)
+
+if len(stored_items) == 0:
+    print "No items selected. Exit"
+    exit()
+
+for script in args.scripts:
+    shellctx.script(script)
+
+shellctx.script('qxpacker.startup.script')
+f = open(args.output, "w")
+
+cntnr.flush(f, "_main")
+st = os.stat(args.output)
+os.chmod(args.output,  st.st_mode | stat.S_IEXEC)

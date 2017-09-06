@@ -1,0 +1,185 @@
+# REQUIRE : array, argparse
+# Needed utilites : mkdir, rm, chmod, pwd, cp
+INSTALLER_TMPDIR="/tmp/installer$INSTALLER_UID/"
+PAYLOAD_ADDR="${INSTALLER_TMPDIR}/.payload$INSTALLER_UID"
+CUR_DIR=`pwd`
+mkdir $INSTALLER_TMPDIR 2>/dev/null
+SELFNAME=$0
+BE_VERBOSE="False"
+payloadTo="False"
+SHELL="/bin/sh"
+TARGET_DIR="./"
+verbosity=0
+
+# $1 - from
+# $2 - to
+# $3 - flags
+move() {
+    if ! mv $3 $1 $2 2>/dev/null ; then
+        cp $3 $1 $2 2>/dev/null
+        rm $3 $1 2>/dev/null
+    fi
+}
+
+cleanup() {
+    rm -rf $INSTALLER_TMPDIR 2>/dev/null
+}
+
+cancel_installation() {
+    cleanup
+    exit
+}
+
+show_fn() {
+    echo $1
+}
+
+show_fn_full() {
+    echo $@
+}
+
+show_list() {
+    foreach dirlist show_fn
+    cancel_installation
+}
+
+show_list_full() {
+    foreach dirlist show_fn_full
+    cancel_installation
+}
+
+print_info() {
+    echo "Installer UID : $INSTALLER_UID"
+    echo "Startup code : $STARTUP_SCRIPT" 
+    echo "Extractor type : $EXTRACTOR_TYPE"
+    echo "Payload type : $PAYLOAD_TYPE"
+    echo "Verbose level: $verbosity"
+    cancel_installation
+}
+
+print_usage() {
+    echo "$0 [option1[option2]...] <path>"
+    echo "<path> -\n\t\t path to package installation. Root by default"
+    echo "-n -\n\t\t dont overwrite existing files"
+    echo "-i --info -\n\t\t print info about installer"
+    echo "-l --list -\n\t\t print files in installer"
+    echo "--list-full -\n\t\t print files in installer"
+    echo "-h --help -\n\t\t print this help"
+    echo "-p --payload <file> -\n\t\t extract payload to target file"
+    cancel_installation
+}
+
+increase_verbosity() {
+    if is_num $1 ;  then 
+        verbosity=$1
+    else
+        verbosity=$(($verbosity+1))
+    fi
+}
+NO_OVERWRITE="False"
+argparse_init
+argparse_add_option "v" "verbose" "increase_verbosity" "Function"
+argparse_add_option "l" "list" "show_list" "Function"
+argparse_add_option "-" "list-full" "show_list_full" "Function"
+argparse_add_option "-" "subchild" "subchild" "String" "/bin/sh"
+argparse_add_option "n" "-" "NO_OVERWRITE" "Boolean" "True"
+argparse_add_option "h" "help" "print_usage" "Function"
+argparse_add_option "p" "payload" "payloadTo" "String"
+argparse_add_option "i" "info" "print_info" "Function"
+
+if ( ["$1" != "--subchild" ] -a ksh -c "true" 2>/dev/null ) ; then
+    echo "Use ksh shell"
+    ksh - $0 --subchild $@
+    exit
+fi
+
+if ( ["$1" != "--subchild" ] -a bash -c "true" 2>/dev/null ) ; then
+    echo "Use bash shell"
+    bash -- $0 --subchild $@
+    exit
+fi
+
+VECHO_DEFAULT_LEVEL=0
+vecho() {
+    local lvl=$VECHO_DEFAULT_LEVEL
+    if is_num $1 ; then
+        lvl=$1
+        shift
+    fi
+    
+    if [ "$verbosity" -gt "$lvl" ] ; then
+        echo "$@"
+    fi
+}
+
+startup() { 
+    if [ "$payloadTo" != "False" ] ; then
+        move ${PAYLOAD_ADDR} $payloadTo
+        cancel_installation
+    fi
+    
+    cd ${INSTALLER_TMPDIR}
+    foreach early_unpack "extract"
+    eval $STARTUP_SCRIPT
+    vecho cd ${CUR_DIR}
+    cd ${CUR_DIR}
+    vecho cd ${TARGET_DIR}
+    cd ${TARGET_DIR}
+    echo "Install to `pwd`"
+    extract
+    echo 'Installation successfull done'
+    cleanup
+    $AFTER_SCRIPT
+}
+
+
+extract() {
+    if [ "$PAYLOAD_TYPE" = "tar" ] ; then
+        tar -xzf $PAYLOAD_ADDR $@
+        return
+    fi
+    
+    if [ "$1" = "" ] ; then
+        if [ -f $PAYLOAD_ADDR ] ; then
+            . $PAYLOAD_ADDR
+        fi
+        unpack_payload
+    else
+        true
+    fi
+}
+
+
+
+shell_extractor_startup() {
+    vecho 1 "Shell extractor startup called ("$@")"
+    vecho 2 "Extract payload"
+    extract_payload "${PAYLOAD_ADDR}"
+    startup $@
+}
+
+dd_extractor_startup() {
+    vecho 1 "dd extractor startup called (" $@ ")"
+    vecho 2 "Extract payload"
+    vecho dd bs=$ALIGN if=$SELFNAME of="${PAYLOAD_ADDR}" skip=$PAYLOAD_OFFSET "2>/dev/null >/dev/null"
+    dd bs=$ALIGN if=$SELFNAME of="${PAYLOAD_ADDR}" skip=$PAYLOAD_OFFSET 2>/dev/null >/dev/null    
+    startup $@
+}
+
+$BEFORE_SCRIPT
+argparse_parse_options $@
+tdir=`val "$(($#+1))" $@`
+if [ "$tdir" != "" ] ; then
+    TARGET_DIR=$tdir
+fi
+
+if [ ! -d "${TARGET_DIR}" -a "$payloadTo" = "False" ] ; then
+    echo "Target directory ${TARGET_DIR} not exists"
+    cancel_installation
+fi
+
+if [ "$EXTRACTOR_TYPE" = "dd" ] ; then
+    dd_extractor_startup $@
+    exit
+fi
+

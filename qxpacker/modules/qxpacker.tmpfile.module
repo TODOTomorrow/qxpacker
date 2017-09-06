@@ -1,0 +1,3 @@
+tmpfilename() {
+    echo "/tmp/tmpfilename"
+}

@@ -1,0 +1,12 @@
+Metadata-Version: 1.0
+Name: qxpacker
+Version: 0.1
+Summary: Qxpacker - tool for packaging files and directories into cross-platform self-extracting single file.
+Home-page: https://github.com/TODOTomorrow/qxpacker
+Author: Alexander P
+Author-email: a.pokid@mail.ru
+License: MIT
+Description-Content-Type: UNKNOWN
+Description: UNKNOWN
+Keywords: packaging crossplatform
+Platform: UNKNOWN
