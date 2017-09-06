@@ -40,7 +40,7 @@ Note, that if you want to start your code after basic installation initializatio
 
 To install package use following syntax:
 ```
-# <package_name> [<installation_path>]
+# <package_name> [-t|--target <installation_path>] [-h|--help] [-i|--info] [-l|--list]
 ```
 If installation path not specified it will be set into ./(current directory)
 
