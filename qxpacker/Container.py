@@ -200,6 +200,7 @@ class Container:
             childlist = node.childs[:]
             for c in childlist:
                 self._del_file_node(c, recursive = True)
+        
         self.datalist.remove(node)
         self.recurse_dirty = True
     
@@ -273,7 +274,7 @@ class Container:
     # 2. List of other keys
     # 3. String with identifier. Format (all parts are optional):
     #         [real file path]=>[target file path]
-    def key2ids(self,key):
+    def key2ids(self,key, strictly = True):
         if isinstance(key , types.ListType):
             n = []
             for k in key:
@@ -297,7 +298,7 @@ class Container:
                         rpath = None
                         tpath = paths[1].strip()
                 nodes = []
-                fnodes = self.search(rpath,tpath, get_ids_only = True)
+                fnodes = self.search(rpath,tpath, get_ids_only = True, strictly = strictly)
                 for f in fnodes:
                     nodes.append(f)
                 return nodes
@@ -327,23 +328,30 @@ class Container:
             #print tpath , [ str(s) for s  in self.parent(fn)]
         
     
+    def is_node_exists(self, node):
+        if node in node.parent.childs:
+            return True
+        return False
+    
     # Exclude file from container
     def exclude(self, kkey):
-#        print "exclude " + str(kkey)
-        nodes = self[kkey]
+        nodes = self.__getitem__(kkey)
+        if len(nodes) == 0:
+            print "[Warning] Cannot exclude %s. Not found in container" % kkey
         for node in nodes:
             for anc in node.ancestors():
                 anc.make_dirty()
                 #anc.full = False
-            self._del_file_node(node, recursive = True)
+            if self.is_node_exists(node):
+                self._del_file_node(node, recursive = True)
             
     
     def get_recurse_datalist(self):
         self._recurse_update()
         return self.datalist_recurse
     
-    def __getitem__(self, kkey, recurse_datalist = False):
-        keys = self.key2ids(kkey)
+    def __getitem__(self, kkey, recurse_datalist = False, strictly = True):
+        keys = self.key2ids(kkey, strictly = strictly)
         d = []
         if recurse_datalist:
             dl = self.get_recurse_datalist()
